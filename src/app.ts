@@ -1,23 +1,35 @@
-import express from "express";
-import compression from "compression";
-import helmet from "helmet";
-import routes from "./routes";
-import cors from "cors";
-import * as dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import Process from "./controllers/process.controller";
 
-dotenv.config();
+const METRICS = ["SHORTER_THAN_15", "MOVER", "SHAKER", "?", "SPAM"];
 
-const app = express();
+console.log("\nAnalyzer is running ...\n\n");
 
-app.set("port", process.env.PORT || 3000);
-app.set("ENV", process.env.NODE_ENV);
+console.time("Time");
 
-app.use(helmet());
-app.use(compression());
-app.use(express.json());
-app.use(cors());
-app.use(express.urlencoded({ extended: true }));
+const directoryPath = path.join(__dirname, "docs");
 
-routes(app);
+fs.readdir(directoryPath, (error, files) => {
+	// error handling
+	if (error) {
+		return console.error("Unable to read directory: ", error);
+	}
 
-export default app;
+	files.forEach((file) => {
+		const filePath = path.join(__dirname, "docs", file);
+
+		fs.readFile(filePath, "utf8", (readError, data) => {
+			if (readError) {
+				return console.error("Unable to read: ", readError);
+			}
+
+			const init = new Process(data, METRICS);
+
+			init.run();
+		});
+	});
+});
+
+console.log(`Used ${process.memoryUsage().heapUsed / 1024 / 1024} MB`);
+console.timeEnd("Time");

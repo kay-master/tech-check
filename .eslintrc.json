@@ -1,7 +1,6 @@
 {
     "root": true,
     "ignorePatterns": [
-        "tests",
         "jest.config.js"
     ],
     "overrides": [
