@@ -1,35 +1,92 @@
 import fs from "fs";
 import path from "path";
+import readline from "readline";
+import pluggableMetrics from "./plugs/metrics";
 import Process from "./controllers/process.controller";
-
-const METRICS = ["SHORTER_THAN_15", "MOVER", "SHAKER", "?", "SPAM"];
+import { MetricResults, ResultInterface } from "./interfaces/metric.interface";
+import combineData from "./utils/combineData";
 
 console.log("\nAnalyzer is running ...\n\n");
 
-console.time("Time");
+// To add more metrics, please add them into the metrics object ./plugs/metrics
+const METRICS = pluggableMetrics;
 
 const directoryPath = path.join(__dirname, "docs");
 
-fs.readdir(directoryPath, (error, files) => {
-	// error handling
-	if (error) {
-		return console.error("Unable to read directory: ", error);
-	}
+const promisedData: Promise<ResultInterface> = new Promise(
+	(resolve, reject) => {
+		let results: MetricResults[][] = [];
+		let closedFiles = 0;
 
-	files.forEach((file) => {
-		const filePath = path.join(__dirname, "docs", file);
+		fs.readdir(directoryPath, async (error, files) => {
+			if (error) {
+				reject({
+					msg: "Unable to read directory",
+					error,
+				});
 
-		fs.readFile(filePath, "utf8", (readError, data) => {
-			if (readError) {
-				return console.error("Unable to read: ", readError);
+				return;
 			}
 
-			const init = new Process(data, METRICS);
+			// let ts = 0;
+			// const limit = 1;
+			const totalFiles = files.length;
 
-			init.run();
+			for (const file of files) {
+				const filePath = path.join(__dirname, "docs", file);
+
+				const rl = readline.createInterface({
+					input: fs.createReadStream(filePath),
+					crlfDelay: Infinity,
+				});
+
+				rl.on("line", (line) => {
+					const init = new Process(line, METRICS);
+
+					const data = init.run();
+
+					results = [...results, data];
+				});
+
+				rl.on("close", () => {
+					closedFiles++;
+				});
+
+				// ts++;
+
+				// if (ts === limit) {
+				// 	break;
+				// }
+			}
+
+			const intervalCheck = setInterval(() => {
+				if (totalFiles === closedFiles) {
+					clearInterval(intervalCheck);
+
+					resolve({
+						msg: "Analyses is complete",
+						results,
+					});
+				}
+			}, 1000);
 		});
-	});
-});
+	}
+);
 
-console.log(`Used ${process.memoryUsage().heapUsed / 1024 / 1024} MB`);
-console.timeEnd("Time");
+(async () => {
+	const data = await promisedData;
+
+	if (data.error) {
+		console.error(data.msg, data.error);
+
+		return;
+	}
+
+	console.log("RESULTS\n=======");
+
+	const results = combineData(data.results || []);
+
+	Object.entries(results).forEach((result) => {
+		console.log(`${result[0]} : ${result[1]}`);
+	});
+})();

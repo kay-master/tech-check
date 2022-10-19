@@ -1,6 +1,17 @@
-export type MetricTypes = "SHORTER_THAN_15" | "MOVER" | "SHAKER" | "?" | "SPAM";
+export type MetricTypes = Record<string, (content: string) => boolean | number>;
+
+export interface MetricResultCollection {
+	metricName: string;
+	results: number | boolean;
+}
 
 export interface MetricResults {
 	metricName: string;
 	total: number;
+}
+
+export interface ResultInterface {
+	msg: string;
+	error?: NodeJS.ErrnoException;
+	results?: MetricResults[][];
 }
