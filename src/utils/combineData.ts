@@ -21,4 +21,8 @@ function combineData(data: MetricResults[][]) {
 	return results;
 }
 
+export function timeConvert(mil: number) {
+	return (mil / 1000).toFixed(2);
+}
+
 export default combineData;

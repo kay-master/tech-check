@@ -1,12 +1,14 @@
 {
     "root": true,
     "ignorePatterns": [
-        "jest.config.js"
+        "jest.config.js",
+        "dist"
     ],
     "overrides": [
         {
             "files": [
-                "*.ts"
+                "*.ts",
+                "*.js"
             ],
             "parserOptions": {
                 "project": [

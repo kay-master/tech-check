@@ -1,19 +1,19 @@
 import fs from "fs";
 import path from "path";
-import readline from "readline";
-import pluggableMetrics from "./plugs/metrics";
-import Process from "./controllers/process.controller";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { Piscina } from "piscina";
+import { MessageChannel } from "worker_threads";
+
 import { MetricResults, ResultInterface } from "./interfaces/metric.interface";
 import combineData, { timeConvert } from "./utils/combineData";
 
 console.log("\nAnalyzer is running ...\n\n");
 
-// To add more metrics, please add them into the metrics object ./plugs/metrics
-const METRICS = pluggableMetrics;
-
 const directoryPath = path.join(__dirname, "../docs");
 
-async function processFn() {
+async function promiseFn() {
 	const promisedData: Promise<ResultInterface> = new Promise(
 		(resolve, reject) => {
 			let results: MetricResults[][] = [];
@@ -33,25 +33,33 @@ async function processFn() {
 				// const limit = 1;
 				const totalFiles = files.length;
 
+				// Create a new thread pool
+				const pool = new Piscina({
+					filename: path.resolve(__dirname, "worker.js"),
+				});
+
 				for (const file of files) {
 					const filePath = path.join(directoryPath, file);
 
-					const rl = readline.createInterface({
-						input: fs.createReadStream(filePath),
-						crlfDelay: Infinity,
+					const channel = new MessageChannel();
+
+					channel.port2.on("message", (message: MetricResults[][]) => {
+						results = [...results, ...message];
+
+						channel.port2.close();
 					});
 
-					rl.on("line", (line) => {
-						const init = new Process(line, METRICS);
-
-						const data = init.run();
-
-						results = [...results, data];
-					});
-
-					rl.on("close", () => {
+					channel.port2.on("close", () => {
 						closedFiles++;
 					});
+
+					await pool.run(
+						{
+							filePath,
+							port: channel.port1,
+						},
+						{ transferList: [channel.port1] }
+					);
 
 					// ts++;
 
@@ -81,7 +89,7 @@ async function processFn() {
 	try {
 		const start = performance.now();
 
-		const data = await processFn();
+		const data = await promiseFn();
 
 		if (data.error) {
 			console.error(data.msg, data.error);
@@ -89,6 +97,7 @@ async function processFn() {
 			console.log(
 				`\nExecution time: ${timeConvert(performance.now() - start)} s\n`
 			);
+
 			return;
 		}
 

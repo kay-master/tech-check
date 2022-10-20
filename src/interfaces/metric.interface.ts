@@ -15,3 +15,9 @@ export interface ResultInterface {
 	error?: NodeJS.ErrnoException;
 	results?: MetricResults[][];
 }
+
+export interface WorkDataInterface {
+	filePath: string;
+	metrics: MetricTypes;
+	port: MessagePort;
+}
